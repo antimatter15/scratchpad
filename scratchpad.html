@@ -10,10 +10,10 @@
     <script>
       function Scratchpad(){
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
-        var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff"});
+        //var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff"});
         $(window).resize(function(){
           pad.setSize($(window).width(), $(window).height());
-          canvas.attr({width: $(window).width() - 40, height: $(window).height()});
+          //canvas.attr({width: $(window).width() - 40, height: $(window).height()});
         });
         
         var palette = pad.set(), stroke = '#000000', colors = ["#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
@@ -37,7 +37,31 @@
           fill: 'rgba(30, 157, 186, 0.5)'
         });
         
+        var line_default = {
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round'};
+            
+        var history = [];
+        function saveState(){
+          for(var i = 0, state = []; i < shapes.length; i++){
+            if(!shapes[i].removed){
+              state.push({
+                path: shapes[i].attr('path').toString(),
+                stroke: shapes[i].attr('stroke')
+              })
+            }
+          }
+          console.log(state);
+          history.push(state);
+        }
         
+        function loadState(state){
+          shapes.remove();
+          for(var i = 0; i < state.length; i++){
+            shapes.push(pad.path(state[i].path).attr(line_default).attr('stroke', state[i].stroke))
+          }
+        }
         
         var tools = pad.set();
         
@@ -84,7 +108,8 @@
                 x: 2,
                 'fill-opacity': 0
               })
-              selected.animate({'fill-opacity': 0.5}, 100)
+              selected.animate({'fill-opacity': 0.5}, 100);
+              loadState(history.pop())
             },100);
           });
           //tool = "undo";
@@ -109,11 +134,8 @@
         });
         
         function startPen(x, y){
-          path = pad.path("M"+x+","+y).attr({
-            stroke: stroke,
-            'stroke-width': 2,
-            'stroke-linecap': 'round',
-            'stroke-linejoin': 'round'
+          path = pad.path("M"+x+","+y).attr(line_default).attr({
+            stroke: stroke
           });
           pathstr = path.attr('path');
           shapes.push(path);
@@ -128,7 +150,7 @@
 
         
         function smoothPath(str){
-          var parts = str.split("L");
+          var parts = str.toString().split("L");
           var start = parts[0].substr(1).split(',')
           var lastx = +start[0], lasty = +start[1];
           var np = parts[0];
@@ -149,6 +171,7 @@
         $(pad.canvas).mouseup(function(e){
           if(path){
             path.attr('path', smoothPath(pathstr));
+            saveState();
           }
           path = null;
           if(tool == 'erase' && eraser){
@@ -159,8 +182,10 @@
               }
             }
             eraser.animate({'fill-opacity': 0}, 100, function(){
-              eraser.remove()
+              eraser.remove();
+              eraser = null;
             });
+            saveState()
           }
         })
         $(pad.canvas).mousemove(function(e){
@@ -172,7 +197,7 @@
               path.attr('path', smoothPath(pathstr));
               startPen(e.clientX, e.clientY);
             }*/
-          }else if(tool == 'erase'){
+          }else if(tool == 'erase' && eraser){
             var x1 = Math.min(e.clientX, eraser.sx),
                 y1 = Math.min(e.clientY, eraser.sy),
                 x2 = Math.max(e.clientX, eraser.sx),
