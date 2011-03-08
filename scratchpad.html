@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+  <head>
+    <title>Scratchpad</title>
+  </head>
+  <body>
+    <script src="raphael-min.js"></script>
+    <script src="jquery-1.5.1.min.js"></script>
+    <script src="icons.js"></script>
+    <script>
+      function Scratchpad(){
+        var pad = Raphael(0, 0, $(window).width(), $(window).height());
+        var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff"});
+        $(window).resize(function(){
+          pad.setSize($(window).width(), $(window).height());
+          canvas.attr({width: $(window).width() - 40, height: $(window).height()});
+        });
+        
+        var palette = pad.set(), stroke = '#000000', colors = ["#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
+        for(var i = 0; i < colors.length; i++){
+          (function(color){
+            palette.push(pad.rect(7, 150 + i * 24, 24, 24).attr({
+              fill: color,
+              stroke: ''
+            }).click(function(e){
+              stroke = color
+              palette.animate({x: 7}, 100)
+              this.animate({x: 15}, 100)
+            }));
+          })(colors[i])
+        }
+        palette[0].attr({x: 15})
+        
+        var selected = pad.rect(2, 2, 30, 30).attr({
+          r: 5,
+          stroke: '',
+          fill: 'rgba(30, 157, 186, 0.5)'
+        });
+        
+        
+        
+        var tools = pad.set();
+        
+        tools.push(pad.path(pen).scale(0.8).translate(0,0))
+
+        tools.push(pad.path(texttool).translate(-13, 47))//pad.text(16, 46, 'A').attr('font','32px serif'))
+        tools.push(pad.path(erase).translate(0,60))
+        tools.push(pad.path(undo).scale(0.7).translate(1,90))
+        
+        var tool = "draw";
+        
+        pad.rect(2, 2, 30, 30).attr({
+          stroke: '',
+          fill: 'black',
+          'fill-opacity': 0
+        }).click(function(){
+          selected.animate({y: 2}, 100);
+          tool = "draw";
+        });
+        pad.rect(2, 2+30, 30, 30).attr({
+          stroke: '',
+          fill: 'black',
+          'fill-opacity': 0
+        }).click(function(){
+          selected.animate({y: 2 + 30}, 100);
+          tool = "text";
+        });
+        pad.rect(2, 2+30*2, 30, 30).attr({
+          stroke: '',
+          fill: 'black',
+          'fill-opacity': 0
+        }).click(function(){
+          selected.animate({y: 2 + 30 * 2}, 100);
+          tool = "erase"
+        });
+        pad.rect(2, 2+30*3, 30, 30).attr({
+          stroke: '',
+          fill: 'black',
+          'fill-opacity': 0
+        }).click(function(){
+          selected.animate({x: -30}, 100, function(){
+            setTimeout(function(){
+              selected.attr({
+                x: 2,
+                'fill-opacity': 0
+              })
+              selected.animate({'fill-opacity': 0.5}, 100)
+            },100);
+          });
+          //tool = "undo";
+        });
+        
+        tools.attr({fill: '#000', stroke: 'none'})
+        var path = null, pathstr = '';
+        var eraser = null;
+        $(pad.canvas).mousedown(function(e){
+          if(e.clientX > 40){
+            if(tool == 'draw'){
+              startPen(e.clientX, e.clientY)
+            }else if(tool == 'erase'){
+              eraser = pad.rect(e.clientX, e.clientY, 0, 0).attr({"fill-opacity": 0.15, 
+              "stroke-opacity": 0.5, 
+              "fill": "#ff0000", //oh noes! its red and gonna asplodes!
+              "stroke": "#ff0000"});
+              eraser.sx = e.clientX;
+              eraser.sy = e.clientY;
+            }
+          }
+        });
+        
+        function startPen(x, y){
+          path = pad.path("M"+x+","+y).attr({
+            stroke: stroke,
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round'
+          });
+          pathstr = path.attr('path');
+          shapes.push(path);
+        }
+        
+        function rectsIntersect(r1, r2) {
+          return r2.x < (r1.x+r1.width) && 
+                  (r2.x+r2.width) > r1.x &&
+                  r2.y < (r1.y+r1.height) &&
+                  (r2.y+r2.height) > r1.y;
+        }
+
+        
+        function smoothPath(str){
+          var parts = str.split("L");
+          var start = parts[0].substr(1).split(',')
+          var lastx = +start[0], lasty = +start[1];
+          var np = parts[0];
+          var lastdist = 0;
+          for(var i = 1; i < parts.length; i++){
+            var p = parts[i].split(',');
+            var dist = (Math.pow(+p[0] - lastx,2) +Math.pow(+p[1] - lasty, 2));
+            if(dist > 10 || dist < lastdist|| i == parts.length -1){
+              np += "L"+parts[i];
+              lasty = p[1];
+              lastx = p[0];
+            }
+            lastdist = dist;
+          }
+          return np
+        }
+        var shapes = pad.set();
+        $(pad.canvas).mouseup(function(e){
+          if(path){
+            path.attr('path', smoothPath(pathstr));
+          }
+          path = null;
+          if(tool == 'erase' && eraser){
+            var ebox = eraser.getBBox();
+            for(var i = 0; i < shapes.length; i++){
+              if(rectsIntersect(ebox, shapes[i].getBBox())){
+                shapes[i].remove();
+              }
+            }
+            eraser.animate({'fill-opacity': 0}, 100, function(){
+              eraser.remove()
+            });
+          }
+        })
+        $(pad.canvas).mousemove(function(e){
+          if(path && tool == 'draw'){
+            pathstr += 'L'+e.clientX+','+e.clientY
+            path.attr('path', pathstr);
+            /*
+            if(pathstr.length > 200){
+              path.attr('path', smoothPath(pathstr));
+              startPen(e.clientX, e.clientY);
+            }*/
+          }else if(tool == 'erase'){
+            var x1 = Math.min(e.clientX, eraser.sx),
+                y1 = Math.min(e.clientY, eraser.sy),
+                x2 = Math.max(e.clientX, eraser.sx),
+                y2 = Math.max(e.clientY, eraser.sy);
+            eraser.attr({
+              x: x1,
+              y: y1,
+              width: x2 - x1,
+              height: y2 - y1
+            })
+          }
+        })
+        
+        return pad;
+      }
+      
+      var sp = Scratchpad();
+    </script>
+  </body>
+</html>
