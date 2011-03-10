@@ -7,6 +7,14 @@
     <script src="raphael-min.js"></script>
     <script src="jquery-1.5.1.min.js"></script>
     <script src="icons.js"></script>
+    <style>
+      .wysiwyg {
+        border: 3px dashed blue;
+        position: absolute;
+        padding: 5px;
+        background-color: white;
+      }
+    </style>
     <script>
       function Scratchpad(){
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
@@ -52,7 +60,7 @@
               })
             }
           }
-          console.log(state);
+          //console.log(state);
           history.push(state);
         }
         
@@ -102,23 +110,18 @@
           fill: 'black',
           'fill-opacity': 0
         }).click(function(){
-          selected.animate({x: -30}, 100, function(){
-            setTimeout(function(){
-              selected.attr({
-                x: 2,
-                'fill-opacity': 0
-              })
-              selected.animate({'fill-opacity': 0.5}, 100);
-              loadState(history.pop())
-            },100);
-          });
-          //tool = "undo";
+          loadState(history.pop())
         });
         
         tools.attr({fill: '#000', stroke: 'none'})
         var path = null, pathstr = '';
         var eraser = null;
+        var text = null;
         $(pad.canvas).mousedown(function(e){
+          if(eraser){
+            eraser.remove();
+            eraser = null;
+          }
           if(e.clientX > 40){
             if(tool == 'draw'){
               startPen(e.clientX, e.clientY)
@@ -129,6 +132,20 @@
               "stroke": "#ff0000"});
               eraser.sx = e.clientX;
               eraser.sy = e.clientY;
+            }else if(tool == 'text'){
+              text = pad.set();
+              text.push(pad.rect(0,0, $(window).width(), $(window).height()).attr({
+                "fill": "#000",
+                "fill-opacity": 0.2
+              }));
+              
+              text = document.createElement("div");
+              text.className = "wysiwyg";
+              text.innerHTML = "Text";
+              text.style.top = e.clientY + 'px';
+              text.style.left = e.clientX + 'px';
+              document.body.appendChild(text);
+              text.contentEditable = true;
             }
           }
         });
@@ -169,6 +186,7 @@
         }
         var shapes = pad.set();
         $(pad.canvas).mouseup(function(e){
+
           if(path){
             path.attr('path', smoothPath(pathstr));
             saveState();
