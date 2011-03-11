@@ -12,6 +12,7 @@
         border: 3px dashed blue;
         position: absolute;
         padding: 5px;
+        font: 24px sans-serif;
         background-color: white;
       }
     </style>
@@ -54,10 +55,22 @@
         function saveState(){
           for(var i = 0, state = []; i < shapes.length; i++){
             if(!shapes[i].removed){
-              state.push({
-                path: shapes[i].attr('path').toString(),
-                stroke: shapes[i].attr('stroke')
-              })
+              if(shapes[i].type == 'path'){
+                state.push({
+                  path: shapes[i].attr('path').toString(),
+                  stroke: shapes[i].attr('stroke'),
+                  type: 'path'
+                })
+              }else if(shapes[i].type == 'text'){
+                state.push({
+                  text: shapes[i].attr('text'),
+                  x: shapes[i].attr('x'),
+                  y: shapes[i].attr('y'),
+                  type: 'text',
+                  fill: shapes[i].attr('stroke'),
+                  font: shapes[i].attr('font')
+                });
+              }
             }
           }
           //console.log(state);
@@ -67,7 +80,11 @@
         function loadState(state){
           shapes.remove();
           for(var i = 0; i < state.length; i++){
-            shapes.push(pad.path(state[i].path).attr(line_default).attr('stroke', state[i].stroke))
+            if(state[i].type == 'path'){
+              shapes.push(pad.path(state[i].path).attr(line_default).attr('stroke', state[i].stroke))
+            }else{
+              shapes.push(pad.text(state[i].x, state[i].y, state[i].text).attr({fill: state[i].fill, font: state[i].font}));
+            }
           }
         }
         
@@ -122,15 +139,18 @@
             eraser.remove();
             eraser = null;
           }
+          saveState();
+          var startlen = shapes.length;
           if(text && e.target.tagName.toLowerCase() != "div"){
-            var padding = parseInt($(text).css('padding-right')) + parseInt($(text).css('border-top-width')) / 2;
-            pad.text(parseInt(text.style.left)+$(text).width()/2 + padding, parseInt(text.style.top) + $(text).height()/2 + padding, $(text).text())
+            if($(text).text().replace(/\s/g,'') != ''){
+              var padding = parseInt($(text).css('padding-right')) + parseInt($(text).css('border-top-width')) / 2;
+              shapes.push(pad.text(parseInt(text.style.left)+$(text).width()/2 + padding, parseInt(text.style.top) + $(text).height()/2 + padding, $(text).text())
               .attr({
                   "font-family":  $(text).css('font-family'),
                   "font-size": $(text).css('font-size'),
                   "fill": stroke
-                });
-            console.log(text.style.font);
+                }));
+            }
             text.parentNode.removeChild(text);
             text = null;
           }
@@ -147,10 +167,10 @@
             }else if(tool == 'text'){
               text = document.createElement("div");
               text.className = "wysiwyg";
-              text.innerHTML = "Text";
+              text.innerHTML = "|";
               text.style.top = e.clientY + 'px';
               text.style.left = e.clientX + 'px';
-              text.style.backgroundColor = stroke;
+              text.style.color = stroke;
               $(text).keydown(function(e){
                 if(e.keyCode == 13)
                   e.preventDefault();
@@ -162,6 +182,10 @@
                 $(text).focus();
               },100);
             }
+          }
+          
+          if(shapes.length == startlen){
+            history.pop();
           }
         });
         
@@ -204,7 +228,7 @@
 
           if(path){
             path.attr('path', smoothPath(pathstr));
-            saveState();
+            //saveState();
           }
           path = null;
           if(tool == 'erase' && eraser){
@@ -218,7 +242,7 @@
               eraser.remove();
               eraser = null;
             });
-            saveState()
+            //saveState()
           }
         })
         $(pad.canvas).mousemove(function(e){
