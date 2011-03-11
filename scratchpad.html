@@ -21,10 +21,13 @@
         user-select: none;
       }
     </style>
-    <script>
+    <script type="text/javascript">
       function Scratchpad(){
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
+
         //var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff"});
+	$('body').bind('selectstart', selectStart);
+
         $(window).resize(function(){
           pad.setSize($(window).width(), $(window).height());
           //canvas.attr({width: $(window).width() - 40, height: $(window).height()});
@@ -201,6 +204,14 @@
             history.pop();
           }
         });
+
+	function selectStart(e) {
+	  if(tool != 'text') {
+	    // Because IE8 is stupid, we have to disable selection so the
+	    // 'accelerators' don't appear
+	    return $(e.target).is(':input');
+	  }
+	}
         
         function startPen(x, y){
           path = pad.path("M"+x+","+y).attr(line_default).attr({
