@@ -122,6 +122,18 @@
             eraser.remove();
             eraser = null;
           }
+          if(text && e.target.tagName.toLowerCase() != "div"){
+            var padding = parseInt($(text).css('padding-right')) + parseInt($(text).css('border-top-width')) / 2;
+            pad.text(parseInt(text.style.left)+$(text).width()/2 + padding, parseInt(text.style.top) + $(text).height()/2 + padding, $(text).text())
+              .attr({
+                  "font-family":  $(text).css('font-family'),
+                  "font-size": $(text).css('font-size'),
+                  "fill": stroke
+                });
+            console.log(text.style.font);
+            text.parentNode.removeChild(text);
+            text = null;
+          }
           if(e.clientX > 40){
             if(tool == 'draw'){
               startPen(e.clientX, e.clientY)
@@ -133,19 +145,22 @@
               eraser.sx = e.clientX;
               eraser.sy = e.clientY;
             }else if(tool == 'text'){
-              text = pad.set();
-              text.push(pad.rect(0,0, $(window).width(), $(window).height()).attr({
-                "fill": "#000",
-                "fill-opacity": 0.2
-              }));
-              
               text = document.createElement("div");
               text.className = "wysiwyg";
               text.innerHTML = "Text";
               text.style.top = e.clientY + 'px';
               text.style.left = e.clientX + 'px';
+              text.style.backgroundColor = stroke;
+              $(text).keydown(function(e){
+                if(e.keyCode == 13)
+                  e.preventDefault();
+              })
               document.body.appendChild(text);
               text.contentEditable = true;
+              setTimeout(function(){
+                $(text).text('');
+                $(text).focus();
+              },100);
             }
           }
         });
