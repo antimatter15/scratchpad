@@ -5,8 +5,7 @@
   </head>
   <body>
     <script src="raphael-min.js"></script>
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.5.1/jquery.min.js"></script>
-    <!--<script src="jquery-1.5.1.min.js"></script>-->
+    <script src="jquery-1.5.1.min.js"></script>
     <script src="icons.js"></script>
     <style>
       .wysiwyg {
@@ -21,13 +20,17 @@
         user-select: none;
       }
     </style>
-    <script>
+    <script type="text/javascript">
       function Scratchpad(){
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
-        //var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff"});
+        // This canvas doesn't do anything, but it needs to be there for IE7 to catch mouse events..
+	      var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff", opacity: "0"});
+
+	      $('body').bind('selectstart', selectStart);
+
         $(window).resize(function(){
           pad.setSize($(window).width(), $(window).height());
-          //canvas.attr({width: $(window).width() - 40, height: $(window).height()});
+	        canvas.attr({width: $(window).width() - 40, height: $(window).height()});
         });
         
         var palette = pad.set(), stroke = '#000000', colors = ["#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
@@ -56,7 +59,7 @@
             'stroke-linecap': 'round',
             'stroke-linejoin': 'round'};
             
-        var history = [];
+        var history = [[]];
         function saveState(){
           for(var i = 0, state = []; i < shapes.length; i++){
             if(!shapes[i].removed){
@@ -190,17 +193,27 @@
               })
               document.body.appendChild(text);
               text.contentEditable = true;
+      	      document.execCommand("enableObjectResizing", false, false);
               setTimeout(function(){
                 $(text).text('');
                 $(text).focus();
               },100);
             }
+	          e.preventDefault();
           }
           
           if(shapes.length == startlen){
             history.pop();
           }
         });
+
+      	function selectStart(e) {
+      	  if(tool != 'text') {
+      	    // Because IE8 is stupid, we have to disable selection so the
+      	    // 'accelerators' don't appear
+      	    return $(e.target).is(':input');
+      	  }
+      	}
         
         function startPen(x, y){
           path = pad.path("M"+x+","+y).attr(line_default).attr({
@@ -282,11 +295,12 @@
             })
           }
         })
-        
         return pad;
       }
       
-      var sp = Scratchpad();
+      $(document).ready(function() {
+	      var sp = Scratchpad();
+      });
     </script>
   </body>
 </html>
