@@ -19,14 +19,23 @@
         -moz-user-select: none;
         user-select: none;
       }
+      
+      input.wysiwyg {
+        background: transparent;
+      }
     </style>
     <script type="text/javascript">
       function Scratchpad(){
+        var mobilesafari = /AppleWebKit.*Mobile/.test(navigator.userAgent);
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
         // This canvas doesn't do anything, but it needs to be there for IE7 to catch mouse events..
 	      var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff", opacity: "0"});
 
-	      $('body').bind('selectstart', selectStart);
+	      $('body').bind('selectstart', function(e) {
+      	  if(tool != 'text') {
+      	    return false;
+      	  }
+      	});
 
         $(window).resize(function(){
           pad.setSize($(window).width(), $(window).height());
@@ -36,14 +45,15 @@
         var palette = pad.set(), stroke = '#000000', colors = ["#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
         for(var i = 0; i < colors.length; i++){
           (function(color){
-            palette.push(pad.rect(7, 150 + i * 24, 24, 24).attr({
-              fill: color,
-              stroke: ''
-            }).click(function(e){
+            var setcolor = function(e){
               stroke = color
               palette.animate({x: 7}, 100)
               this.animate({x: 15}, 100)
-            }));
+            };
+            palette.push(pad.rect(7, 150 + i * 24, 24, 24).attr({
+              fill: color,
+              stroke: ''
+            }).touchstart(setcolor).click(setcolor));
           })(colors[i])
         }
         palette[0].attr({x: 15})
@@ -81,7 +91,6 @@
               }
             }
           }
-          //console.log(state);
           history.push(state);
         }
         
@@ -113,54 +122,67 @@
         tools.push(pad.path(undo).scale(0.7).translate(1,90))
         
         var tool = "draw";
-        
+        function penclick(){
+          selected.animate({y: 2}, 100);
+          tool = "draw";
+        }
         pad.rect(2, 2, 30, 30).attr({
           stroke: '',
           fill: 'black',
           'fill-opacity': 0
-        }).click(function(){
-          selected.animate({y: 2}, 100);
-          tool = "draw";
-        });
+        }).click(penclick).touchstart(penclick);
+        function textclick(){
+          selected.animate({y: 2 + 30}, 100);
+          tool = "text";
+        }
         pad.rect(2, 2+30, 30, 30).attr({
           stroke: '',
           fill: 'black',
           'fill-opacity': 0
-        }).click(function(){
-          selected.animate({y: 2 + 30}, 100);
-          tool = "text";
-        });
+        }).click(textclick).touchstart(textclick);
+        function eraseclick(){
+          selected.animate({y: 2 + 30 * 2}, 100);
+          tool = "erase"
+        }
         pad.rect(2, 2+30*2, 30, 30).attr({
           stroke: '',
           fill: 'black',
           'fill-opacity': 0
-        }).click(function(){
-          selected.animate({y: 2 + 30 * 2}, 100);
-          tool = "erase"
-        });
+        }).click(eraseclick).touchstart(eraseclick);
+        function undoclick(){
+          loadState(history.pop())
+        }
         pad.rect(2, 2+30*3, 30, 30).attr({
           stroke: '',
           fill: 'black',
           'fill-opacity': 0
-        }).click(function(){
-          loadState(history.pop())
-        });
+        }).click(undoclick).touchstart(undoclick);
         
         tools.attr({fill: '#000', stroke: 'none'})
         var path = null, pathstr = '';
         var eraser = null;
         var text = null;
-        $(pad.canvas).mousedown(function(e){
+        function mousedown(X,Y,e){
+          if(!X || !Y || !e) return;
+          
           if(eraser){
             eraser.remove();
             eraser = null;
           }
           saveState();
           var startlen = shapes.length;
-          if(text && e.target.tagName.toLowerCase() != "div"){
-            if($(text).text().replace(/\s/g,'') != ''){
+          if(text){
+            var value = '';
+            if(mobilesafari){
+              value = $(text).val();
+            }else if(e.target.tagName.toLowerCase() != "div"){
+              value = $(text).text();
+            }
+            if(value.replace(/\s/g,'') != ''){
               var padding = parseInt($(text).css('padding-right')) + parseInt($(text).css('border-top-width')) / 2;
-              shapes.push(pad.text(parseInt(text.style.left)+$(text).width()/2 + padding, parseInt(text.style.top) + $(text).height()/2 + padding, $(text).text())
+              shapes.push(pad.text(parseInt(text.style.left)+$(text).width()/2 + padding, 
+                                   parseInt(text.style.top) + $(text).height()/2 + padding, 
+                                   value)
               .attr({
                   "font-family":  $(text).css('font-family'),
                   "font-size": $(text).css('font-size'),
@@ -170,50 +192,57 @@
             text.parentNode.removeChild(text);
             text = null;
           }
-          if(e.clientX > 40){
+          if(X > 40){
             if(tool == 'draw'){
-              startPen(e.clientX, e.clientY)
+              startPen(X, Y)
             }else if(tool == 'erase'){
-              eraser = pad.rect(e.clientX, e.clientY, 0, 0).attr({"fill-opacity": 0.15, 
+              eraser = pad.rect(X, Y, 0, 0).attr({"fill-opacity": 0.15, 
               "stroke-opacity": 0.5, 
               "fill": "#ff0000", //oh noes! its red and gonna asplodes!
               "stroke": "#ff0000"});
-              eraser.sx = e.clientX;
-              eraser.sy = e.clientY;
+              eraser.sx = X;
+              eraser.sy = Y;
             }else if(tool == 'text'){
-              text = document.createElement("div");
-              text.className = "wysiwyg";
-              text.innerHTML = "|";
-              text.style.top = e.clientY + 'px';
-              text.style.left = e.clientX + 'px';
-              text.style.color = stroke;
-              $(text).keydown(function(e){
-                if(e.keyCode == 13)
-                  e.preventDefault();
-              })
-              document.body.appendChild(text);
-              text.contentEditable = true;
-      	      document.execCommand("enableObjectResizing", false, false);
-              setTimeout(function(){
-                $(text).text('');
-                $(text).focus();
-              },100);
+              if(mobilesafari){
+                text = document.createElement('input');
+                text.className = 'wysiwyg';
+                
+                text.style.top = Y + 'px';
+                text.style.left = X + 'px';
+                text.style.color = stroke;
+                document.body.appendChild(text);
+                
+                setTimeout(function(){
+                  $(text).focus();
+                },100);
+              }else{
+                text = document.createElement("div");
+                text.className = "wysiwyg";
+                text.innerHTML = "|";
+                text.style.top = Y + 'px';
+                text.style.left = X + 'px';
+                text.style.color = stroke;
+                $(text).keydown(function(e){
+                  if(e.keyCode == 13)
+                    e.preventDefault();
+                });
+                document.body.appendChild(text);
+                text.contentEditable = true;
+        	      document.execCommand("enableObjectResizing", false, false);
+                
+                setTimeout(function(){
+                  $(text).text('');
+                  $(text).focus();
+                },100);
+              }
             }
-	          e.preventDefault();
           }
-          
           if(shapes.length == startlen){
             history.pop();
           }
-        });
+        }
 
-      	function selectStart(e) {
-      	  if(tool != 'text') {
-      	    // Because IE8 is stupid, we have to disable selection so the
-      	    // 'accelerators' don't appear
-      	    return $(e.target).is(':input');
-      	  }
-      	}
+      	
         
         function startPen(x, y){
           path = pad.path("M"+x+","+y).attr(line_default).attr({
@@ -250,11 +279,10 @@
           return np
         }
         var shapes = pad.set();
-        $(pad.canvas).mouseup(function(e){
+        function mouseup(){
 
           if(path){
             path.attr('path', smoothPath(pathstr));
-            //saveState();
           }
           path = null;
           if(tool == 'erase' && eraser){
@@ -269,24 +297,18 @@
               eraser.remove();
               eraser = null;
             });
-            //saveState()
           }
           
-        })
-        $(pad.canvas).mousemove(function(e){
+        }
+        function mousemove(X,Y){
           if(path && tool == 'draw'){
-            pathstr += 'L'+e.clientX+','+e.clientY
+            pathstr += 'L'+X+','+Y
             path.attr('path', pathstr);
-            /*
-            if(pathstr.length > 200){
-              path.attr('path', smoothPath(pathstr));
-              startPen(e.clientX, e.clientY);
-            }*/
           }else if(tool == 'erase' && eraser){
-            var x1 = Math.min(e.clientX, eraser.sx),
-                y1 = Math.min(e.clientY, eraser.sy),
-                x2 = Math.max(e.clientX, eraser.sx),
-                y2 = Math.max(e.clientY, eraser.sy);
+            var x1 = Math.min(X, eraser.sx),
+                y1 = Math.min(Y, eraser.sy),
+                x2 = Math.max(X, eraser.sx),
+                y2 = Math.max(Y, eraser.sy);
             eraser.attr({
               x: x1,
               y: y1,
@@ -294,7 +316,34 @@
               height: y2 - y1
             })
           }
+        };
+        
+        $(pad.canvas).mouseup(function(e){
+          mouseup();
+          e.preventDefault();
+        });
+        $(pad.canvas).mousemove(function(e){
+          mousemove(e.clientX, e.clientY);
+          e.preventDefault();
         })
+        $(pad.canvas).mousedown(function(e){
+          mousedown(e.clientX, e.clientY, e);
+          e.preventDefault();
+        });
+        
+        $(pad.canvas).bind('touchstart', function(e){
+          mousedown(e.originalEvent.touches[0].clientX, e.originalEvent.touches[0].clientY, e.originalEvent);
+          e.preventDefault();
+        });
+        $(pad.canvas).bind('touchmove', function(e){
+          mousemove(e.originalEvent.touches[0].clientX, e.originalEvent.touches[0].clientY)
+          e.preventDefault();
+        });
+        $(pad.canvas).bind('touchend', function(e){
+          mouseup();
+          e.preventDefault();
+        });
+        
         return pad;
       }
       
