@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html>
   <head>
@@ -28,18 +29,25 @@
       function Scratchpad(){
         var mobilesafari = /AppleWebKit.*Mobile/.test(navigator.userAgent);
         var pad = Raphael(0, 0, $(window).width(), $(window).height());
+      // img = new Image();
+      // img.src = "http://gmic.sourceforge.net/tutorialimages/resized-image-1.jpg";
+      // img.onload = function() {
+      //   pad.image(img.src, 90, 90, 320, 240);
+      //   console.log('loaded...');
+      // };
+    
         // This canvas doesn't do anything, but it needs to be there for IE7 to catch mouse events..
-	      var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff", opacity: "0"});
+        var canvas = pad.rect(40, 0, $(window).width() - 40, $(window).height()).attr({stroke: "", fill: "#ffffff", opacity: "0"});
 
-	      $('body').bind('selectstart', function(e) {
-      	  if(tool != 'text') {
-      	    return false;
-      	  }
-      	});
+        $('body').bind('selectstart', function(e) {
+          if(tool != 'text') {
+            return false;
+          }
+        });
 
         $(window).resize(function(){
           pad.setSize($(window).width(), $(window).height());
-	        canvas.attr({width: $(window).width() - 40, height: $(window).height()});
+          canvas.attr({width: $(window).width() - 40, height: $(window).height()});
         });
         
         var palette = pad.set(), stroke = '#000000', colors = ["#000000", "#3f3f3f", "#7f7f7f", "#bfbfbf", "#ff0000", "#ff7f00", "#ffff00", "#00ff00", "#00ffff", "#007fff", "#0000ff", "#7f00ff"];
@@ -70,7 +78,7 @@
             'stroke-linejoin': 'round'};
             
         var history = [[]];
-        function saveState(){
+        function getState(){
           for(var i = 0, state = []; i < shapes.length; i++){
             if(!shapes[i].removed){
               if(shapes[i].type == 'path'){
@@ -85,13 +93,16 @@
                   x: shapes[i].attr('x'),
                   y: shapes[i].attr('y'),
                   type: 'text',
-                  fill: shapes[i].attr('stroke'),
-                  font: shapes[i].attr('font')
+                  fill: shapes[i].attr('fill'),
+                  font: shapes[i].attr('font-size') + ' ' + shapes[i].attr('font-family')
                 });
               }
             }
           }
-          history.push(state);
+          return state;
+        }
+        function saveState(){
+          history.push(getState());
         }
         
         function loadState(state){
@@ -228,7 +239,7 @@
                 });
                 document.body.appendChild(text);
                 text.contentEditable = true;
-        	      document.execCommand("enableObjectResizing", false, false);
+                document.execCommand("enableObjectResizing", false, false);
                 
                 setTimeout(function(){
                   $(text).text('');
@@ -242,7 +253,7 @@
           }
         }
 
-      	
+        
         
         function startPen(x, y){
           path = pad.path("M"+x+","+y).attr(line_default).attr({
@@ -343,12 +354,48 @@
           mouseup();
           e.preventDefault();
         });
-        
+
+        function exportAsCanvas(){
+          var canvas = document.createElement('canvas');
+          canvas.width = pad.width;
+          canvas.height = pad.height;
+          var ctx = canvas.getContext('2d');
+          var state = getState();
+          // TODO: here, add the image thing
+          // ctx.drawImage(img, 0, 0)
+          for(var x = 0; x < state.length; x++){
+            var shape = state[x];
+            if(shape.type == 'path'){
+              ctx.strokeStyle = shape.stroke;
+              ctx.lineWidth = line_default['stroke-width'];
+              ctx.lineJoin = line_default['stroke-linejoin'];
+              ctx.lineCap = line_default['stroke-linecap'];
+
+              ctx.beginPath()
+              var parts = shape.path.split('L');
+              var start = parts[0].slice(1).split(',');
+              ctx.moveTo(+start[0], +start[1]);
+              for(var i = 1; i < parts.length; i++){
+                var point = parts[i].split(',')
+                ctx.lineTo(+point[0], +point[1])
+              }
+              ctx.stroke();
+            }else if(shape.type == 'text'){
+              ctx.font = shape.font;
+              ctx.fillStyle = shape.fill;
+              var metrics = ctx.measureText(shape.text);
+              ctx.fillText(shape.text, shape.x - metrics.width / 2, shape.y + 7); // the magic number 7 +/- 2 i guess
+            }
+          }
+          return canvas;
+        }
+        pad.getState = getState;
+        pad.exportAsCanvas = exportAsCanvas;
         return pad;
       }
       
       $(document).ready(function() {
-	      var sp = Scratchpad();
+        sp = Scratchpad();
       });
     </script>
   </body>
